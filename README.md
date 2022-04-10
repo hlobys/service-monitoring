@@ -26,3 +26,8 @@ go get github.com/shirou/gopsutil/v3/...
 ```bash
 go build -o system-monitor
 ```
+
+## To run the system monitor, simply execute the compiled binary:
+```bash
+./system-monitor
+```
