@@ -8,3 +8,21 @@ This is a simple system monitoring utility written in Go that gathers real-time 
 - Monitor memory usage (total, used, and free)
 - Monitor disk usage (total, used, and free)
 - Monitor network usage (bytes sent and received)
+
+## Clone the repository:
+
+```bash
+git clone https://github.com/yourusername/system-monitor.git
+cd system-monitor
+```
+## Install the required dependencies:
+
+```bash
+go get github.com/shirou/gopsutil/v3/...
+```
+
+## Build the project:
+
+```bash
+go build -o system-monitor
+```
