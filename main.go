@@ -1,21 +1,64 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
+	"gopkg.in/yaml.v2"
 )
 
+// Config structure to hold YAML configuration
+type Config struct {
+	Interval int `yaml:"interval"`
+}
+
+// Function to load configuration from a YAML file
+func loadConfig(configFile string) (Config, error) {
+	var config Config
+	data, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		return config, err
+	}
+	err = yaml.Unmarshal(data, &config)
+	if err != nil {
+		return config, err
+	}
+	return config, nil
+}
+
 func main() {
-	// Start monitoring in a loop
+	// Define command-line flags
+	updateInterval := flag.String("interval", "", "Update interval in seconds")
+	configFile := flag.String("config", "config.yaml", "Path to configuration file")
+	flag.Parse()
+
+	// Load configuration from file
+	config, err := loadConfig(*configFile)
+	if err != nil {
+		log.Fatalf("Error loading config file: %v", err)
+	}
+
+	// Determine interval (from command-line flag or config file)
+	interval := config.Interval
+	if *updateInterval != "" {
+		interval, err = strconv.Atoi(*updateInterval)
+		if err != nil || interval <= 0 {
+			log.Fatalf("Invalid interval: %s. Please provide a positive integer.", *updateInterval)
+		}
+	}
+
+	// Start monitoring in a loop with the user-defined interval
 	for {
 		monitorSystem()
-		time.Sleep(5 * time.Second) // Refresh every 5 seconds
+		time.Sleep(time.Duration(interval) * time.Second)
 	}
 }
 
