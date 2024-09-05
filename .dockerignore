@@ -1,0 +1,5 @@
+# Ignore the build directory
+/build
+# Ignore Go-specific directories
+/bin
+/pkg
