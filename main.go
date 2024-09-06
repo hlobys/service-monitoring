@@ -20,76 +20,104 @@ type Config struct {
 	Interval int `yaml:"interval"`
 }
 
-// Function to load configuration from a YAML file
+// loadConfig loads configuration from a YAML file
 func loadConfig(configFile string) (Config, error) {
-	var config Config
 	data, err := ioutil.ReadFile(configFile)
 	if err != nil {
-		return config, err
+		return Config{}, fmt.Errorf("error reading config file: %w", err)
 	}
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
-		return config, err
+
+	var config Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return Config{}, fmt.Errorf("error parsing config file: %w", err)
 	}
+
 	return config, nil
 }
 
 func main() {
-	// Define command-line flags
-	updateInterval := flag.String("interval", "", "Update interval in seconds")
-	configFile := flag.String("config", "config.yaml", "Path to configuration file")
-	flag.Parse()
-
-	// Load configuration from file
-	config, err := loadConfig(*configFile)
+	interval, err := parseFlags()
 	if err != nil {
-		log.Fatalf("Error loading config file: %v", err)
+		log.Fatalf("Error parsing flags: %v", err)
 	}
 
-	// Determine interval (from command-line flag or config file)
-	interval := config.Interval
-	if *updateInterval != "" {
-		interval, err = strconv.Atoi(*updateInterval)
-		if err != nil || interval <= 0 {
-			log.Fatalf("Invalid interval: %s. Please provide a positive integer.", *updateInterval)
-		}
-	}
-
-	// Start monitoring in a loop with the user-defined interval
 	for {
-		monitorSystem()
+		if err := monitorSystem(); err != nil {
+			log.Printf("Error monitoring system: %v", err)
+		}
 		time.Sleep(time.Duration(interval) * time.Second)
 	}
 }
 
-func monitorSystem() {
-	// Get CPU usage information
+func parseFlags() (int, error) {
+	updateInterval := flag.String("interval", "", "Update interval in seconds")
+	configFile := flag.String("config", "config.yaml", "Path to configuration file")
+	flag.Parse()
+
+	config, err := loadConfig(*configFile)
+	if err != nil {
+		return 0, fmt.Errorf("error loading config file: %w", err)
+	}
+
+	interval := config.Interval
+	if *updateInterval != "" {
+		interval, err = strconv.Atoi(*updateInterval)
+		if err != nil || interval <= 0 {
+			return 0, fmt.Errorf("invalid interval: %s. Please provide a positive integer", *updateInterval)
+		}
+	}
+
+	return interval, nil
+}
+
+func monitorSystem() error {
+	cpuPercent, err := getCPUUsage()
+	if err != nil {
+		return fmt.Errorf("error getting CPU info: %w", err)
+	}
+
+	virtualMem, err := getMemoryUsage()
+	if err != nil {
+		return fmt.Errorf("error getting memory info: %w", err)
+	}
+
+	diskUsage, err := getDiskUsage()
+	if err != nil {
+		return fmt.Errorf("error getting disk info: %w", err)
+	}
+
+	netIO, err := getNetworkUsage()
+	if err != nil {
+		return fmt.Errorf("error getting network info: %w", err)
+	}
+
+	printSystemInfo(cpuPercent, virtualMem, diskUsage, netIO)
+	return nil
+}
+
+func getCPUUsage() (float64, error) {
 	cpuPercent, err := cpu.Percent(0, false)
 	if err != nil {
-		log.Fatalf("Error getting CPU info: %v", err)
+		return 0, err
 	}
+	return cpuPercent[0], nil
+}
 
-	// Get memory usage information
-	virtualMem, err := mem.VirtualMemory()
-	if err != nil {
-		log.Fatalf("Error getting memory info: %v", err)
-	}
+func getMemoryUsage() (*mem.VirtualMemoryStat, error) {
+	return mem.VirtualMemory()
+}
 
-	// Get disk usage information
-	diskUsage, err := disk.Usage("/")
-	if err != nil {
-		log.Fatalf("Error getting disk info: %v", err)
-	}
+func getDiskUsage() (*disk.UsageStat, error) {
+	return disk.Usage("/")
+}
 
-	// Get network interface information
-	netIO, err := net.IOCounters(false)
-	if err != nil {
-		log.Fatalf("Error getting network info: %v", err)
-	}
+func getNetworkUsage() ([]net.IOCountersStat, error) {
+	return net.IOCounters(false)
+}
 
-	// Print the results
+func printSystemInfo(cpuPercent float64, virtualMem *mem.VirtualMemoryStat, diskUsage *disk.UsageStat, netIO []net.IOCountersStat) {
 	fmt.Printf("\n--- System Information ---\n")
-	fmt.Printf("CPU Usage: %.2f%%\n", cpuPercent[0])
+	fmt.Printf("CPU Usage: %.2f%%\n", cpuPercent)
 	fmt.Printf("Memory Usage: %.2f%% (Total: %v, Free: %v)\n", virtualMem.UsedPercent, virtualMem.Total, virtualMem.Free)
 	fmt.Printf("Disk Usage: %.2f%% (Total: %v, Free: %v)\n", diskUsage.UsedPercent, diskUsage.Total, diskUsage.Free)
 	fmt.Printf("Network Sent: %v, Received: %v\n", netIO[0].BytesSent, netIO[0].BytesRecv)
